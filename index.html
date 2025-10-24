@@ -565,9 +565,26 @@
             <div class="form-section">
                 <label for="model-select">🤖 AI Model</label>
                 <select id="model-select" disabled>
-                    <option value="fw-bsky-bot-gemini/gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro Preview - $$$ - High Quality</option>
-                    <option value="fw-bsky-bot-openAI/o3">OpenAI o3 - $$$$ - Premium Reasoning</option>
-                    <option value="fw-bsky-bot-openAI/o4-mini">OpenAI o4-mini - $$ - Balanced</option>
+                    <!-- Google Models (Default) -->
+                    <optgroup label="🔷 Google (Default)">
+                        <option value="google_ai/gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro Preview ⭐</option>
+                        <option value="google_ai/gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    </optgroup>
+                    
+                    <!-- OpenAI Models -->
+                    <optgroup label="🔶 OpenAI">
+                        <option value="openai/gpt-5-mini-2025-08-07">GPT-5 Mini</option>
+                        <option value="openai/gpt-5-2025-08-07">GPT-5</option>
+                        <option value="openai/gpt-5-nano-2025-08-07">GPT-5 Nano</option>
+                        <option value="openai/o3-2025-04-16">O3 (Reasoning)</option>
+                        <option value="openai/o4-mini-2025-04-16">O4 Mini</option>
+                    </optgroup>
+                    
+                    <!-- Anthropic Models -->
+                    <optgroup label="🔸 Anthropic">
+                        <option value="anthropic/claude-sonnet-4-5-20250929">Claude Sonnet 4.5</option>
+                        <option value="anthropic/claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+                    </optgroup>
                 </select>
                 <div class="hint">💡 Select the AI model for your bot's responses</div>
             </div>
@@ -725,7 +742,7 @@
             toggleBtn.disabled = false;
 
             // Update settings display
-            document.getElementById('display-model').textContent = data.model || 'fw-bsky-bot-openAI/o4-mini';
+            document.getElementById('display-model').textContent = data.model || 'google/gemini-2.5-pro-preview-06-05';
             document.getElementById('display-max-posts').textContent = `${data.maxPostsPerHour || 10} (${data.postsThisHour || 0} used)`;
             
             const quietEnabled = data.quietHoursEnabled || false;
@@ -734,7 +751,7 @@
             document.getElementById('display-quiet-hours').textContent = quietEnabled ? `${quietStart} - ${quietEnd}` : 'Disabled';
 
             // Update form fields
-            document.getElementById('model-select').value = data.model || 'fw-bsky-bot-openAI/o4-mini';
+            document.getElementById('model-select').value = data.model || 'google/gemini-2.5-pro-preview-06-05';
             document.getElementById('max-posts-range').value = data.maxPostsPerHour || 10;
             document.getElementById('max-posts-value').textContent = data.maxPostsPerHour || 10;
             document.getElementById('quiet-hours-enabled').checked = quietEnabled;
