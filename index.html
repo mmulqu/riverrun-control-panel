@@ -742,7 +742,7 @@
             toggleBtn.disabled = false;
 
             // Update settings display
-            document.getElementById('display-model').textContent = data.model || 'google/gemini-2.5-pro-preview-06-05';
+            document.getElementById('display-model').textContent = data.model || 'google_ai/gemini-2.5-pro-preview-06-05';
             document.getElementById('display-max-posts').textContent = `${data.maxPostsPerHour || 10} (${data.postsThisHour || 0} used)`;
             
             const quietEnabled = data.quietHoursEnabled || false;
@@ -751,7 +751,7 @@
             document.getElementById('display-quiet-hours').textContent = quietEnabled ? `${quietStart} - ${quietEnd}` : 'Disabled';
 
             // Update form fields
-            document.getElementById('model-select').value = data.model || 'google/gemini-2.5-pro-preview-06-05';
+            document.getElementById('model-select').value = data.model || 'google_ai/gemini-2.5-pro-preview-06-05';
             document.getElementById('max-posts-range').value = data.maxPostsPerHour || 10;
             document.getElementById('max-posts-value').textContent = data.maxPostsPerHour || 10;
             document.getElementById('quiet-hours-enabled').checked = quietEnabled;
@@ -809,6 +809,13 @@
 
         // Save settings
         async function saveSettings() {
+            console.log('[saveSettings] Function called');
+            
+            if (!secret) {
+                showError('Please enter your password first');
+                return;
+            }
+            
             const saveButtons = document.querySelectorAll('.save-button');
             saveButtons.forEach(btn => btn.disabled = true);
 
@@ -820,7 +827,11 @@
                 quietHoursEnd: document.getElementById('quiet-end').value
             };
 
+            console.log('[saveSettings] Sending settings:', settings);
+            console.log('[saveSettings] Using secret:', secret ? '***' + secret.slice(-4) : 'MISSING');
+
             try {
+                console.log('[saveSettings] Making POST request to:', `${API_URL}/control/settings`);
                 const response = await fetch(`${API_URL}/control/settings`, {
                     method: 'POST',
                     headers: {
@@ -830,6 +841,8 @@
                     body: JSON.stringify(settings)
                 });
 
+                console.log('[saveSettings] Response status:', response.status);
+
                 if (response.status === 401) {
                     showError('Invalid password');
                     saveButtons.forEach(btn => btn.disabled = false);
@@ -837,12 +850,16 @@
                 }
 
                 const data = await response.json();
+                console.log('[saveSettings] Response data:', data);
                 currentSettings = data;
                 updateUI(data);
                 showSuccess('Settings saved successfully!');
+                
+                // Save secret on successful operation
+                localStorage.setItem('riverrun_secret', secret);
             } catch (error) {
-                console.error('Error saving settings:', error);
-                showError('Error saving settings');
+                console.error('[saveSettings] Error:', error);
+                showError('Error saving settings: ' + error.message);
             }
 
             saveButtons.forEach(btn => btn.disabled = false);
