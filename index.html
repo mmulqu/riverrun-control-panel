@@ -530,6 +530,7 @@
             <button class="tab active" onclick="switchTab('control')">🎮 Control</button>
             <button class="tab" onclick="switchTab('costs')">💰 Costs</button>
             <button class="tab" onclick="switchTab('schedule')">⏰ Schedule</button>
+            <button class="tab" onclick="switchTab('letta')">🧠 Letta</button>
         </div>
 
         <!-- Control Tab -->
@@ -664,6 +665,89 @@
             </button>
         </div>
 
+        <!-- Letta Tab -->
+        <div id="letta-tab" class="tab-content">
+            <div class="info-box info">
+                <div style="font-weight: bold; margin-bottom: 10px;">
+                    🧠 Letta Self-Hosted Server
+                </div>
+                <div style="font-size: 0.85em;">
+                    Connect to your self-hosted Letta server to manage agents and switch LLM models dynamically.
+                </div>
+            </div>
+
+            <!-- Letta Server Configuration -->
+            <div class="form-section">
+                <label for="letta-url">🌐 Letta Server URL</label>
+                <input
+                    type="text"
+                    id="letta-url"
+                    placeholder="https://your-ngrok-url.ngrok-free.app"
+                    style="width: 100%; padding: 12px; font-size: 0.95em; border: 1px solid rgba(100, 200, 220, 0.3); border-radius: 12px; background: rgba(5, 30, 40, 0.4); margin-bottom: 5px; color: rgba(100, 200, 220, 0.9);"
+                >
+                <div class="hint">💡 Enter your ngrok URL or Tailscale Funnel URL (e.g., https://nucboxg3.tail903c5f.ts.net)</div>
+            </div>
+
+            <div class="form-section">
+                <label for="letta-password">🔑 Letta Server Password</label>
+                <input
+                    type="password"
+                    id="letta-password"
+                    placeholder="Your Letta server password"
+                    style="width: 100%; padding: 12px; font-size: 0.95em; border: 1px solid rgba(100, 200, 220, 0.3); border-radius: 12px; background: rgba(5, 30, 40, 0.4); margin-bottom: 5px; color: rgba(100, 200, 220, 0.9);"
+                >
+                <div class="hint">💡 The LETTA_SERVER_PASSWORD from your .env file</div>
+            </div>
+
+            <button class="save-button" onclick="testLettaConnection()" id="test-letta-btn">
+                🔌 Test Connection
+            </button>
+
+            <div id="letta-connection-status" style="display: none; margin-top: 10px;"></div>
+
+            <!-- Agent Management Section (shown after successful connection) -->
+            <div id="letta-agent-section" style="display: none; margin-top: 20px;">
+                <div class="form-section">
+                    <label for="letta-agent-select">🤖 Select Agent</label>
+                    <select id="letta-agent-select" onchange="selectLettaAgent()">
+                        <option value="">-- Select an agent --</option>
+                    </select>
+                    <div class="hint">Choose the Letta agent to manage</div>
+                </div>
+
+                <!-- Agent Details (shown after agent selection) -->
+                <div id="letta-agent-details" style="display: none;">
+                    <div class="settings-display" style="margin-top: 15px;">
+                        <div><strong>📛 Agent Name:</strong> <span id="letta-agent-name">-</span></div>
+                        <div><strong>🤖 Current Model:</strong> <span id="letta-current-model">-</span></div>
+                        <div><strong>💾 Memory Backend:</strong> <span id="letta-memory-backend">-</span></div>
+                    </div>
+
+                    <div class="form-section" style="margin-top: 20px;">
+                        <label for="letta-model-select">🔄 Switch to Model</label>
+                        <select id="letta-model-select">
+                            <option value="">-- Loading models... --</option>
+                        </select>
+                        <div class="hint">Select a new LLM model for this agent</div>
+                    </div>
+
+                    <button class="save-button" onclick="updateLettaAgentModel()" id="update-model-btn">
+                        ✨ Update Agent Model
+                    </button>
+                </div>
+            </div>
+
+            <div class="info-box warning" style="margin-top: 20px;">
+                <div style="font-weight: bold; margin-bottom: 10px;">⚠️ Important Notes</div>
+                <div style="font-size: 0.85em;">
+                    • Make sure your Letta server is running and accessible<br>
+                    • ngrok URLs change when ngrok restarts (use Tailscale for persistent URLs)<br>
+                    • Model changes take effect immediately for the agent<br>
+                    • Your credentials are stored locally in browser storage
+                </div>
+            </div>
+        </div>
+
         <!-- Auth Section -->
         <div class="auth-section">
             <input 
@@ -684,9 +768,26 @@
         let currentSettings = {};
         let secret = localStorage.getItem('riverrun_secret') || '';
 
+        // Letta configuration
+        let lettaConfig = {
+            baseUrl: localStorage.getItem('letta_base_url') || '',
+            password: localStorage.getItem('letta_password') || '',
+        };
+        let lettaAgents = [];
+        let lettaModels = [];
+        let selectedAgent = null;
+
         // Set secret from localStorage if it exists
         if (secret) {
             document.getElementById('secretInput').value = secret;
+        }
+
+        // Set Letta config from localStorage if it exists
+        if (lettaConfig.baseUrl) {
+            document.getElementById('letta-url').value = lettaConfig.baseUrl;
+        }
+        if (lettaConfig.password) {
+            document.getElementById('letta-password').value = lettaConfig.password;
         }
 
         // Tab switching
@@ -864,6 +965,275 @@
 
             saveButtons.forEach(btn => btn.disabled = false);
         }
+
+        // ========== LETTA FUNCTIONS ==========
+
+        // Test Letta server connection
+        async function testLettaConnection() {
+            const urlInput = document.getElementById('letta-url');
+            const passwordInput = document.getElementById('letta-password');
+            const statusDiv = document.getElementById('letta-connection-status');
+            const testBtn = document.getElementById('test-letta-btn');
+
+            lettaConfig.baseUrl = urlInput.value.trim();
+            lettaConfig.password = passwordInput.value.trim();
+
+            if (!lettaConfig.baseUrl) {
+                showLettaStatus('Please enter a Letta server URL', 'error');
+                return;
+            }
+
+            testBtn.disabled = true;
+            testBtn.textContent = '🔄 Testing...';
+
+            try {
+                const response = await fetch(`${lettaConfig.baseUrl}/v1/health`, {
+                    headers: {
+                        'Authorization': `Bearer ${lettaConfig.password}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // Save credentials to localStorage
+                localStorage.setItem('letta_base_url', lettaConfig.baseUrl);
+                localStorage.setItem('letta_password', lettaConfig.password);
+
+                showLettaStatus(`✅ Connected! Letta v${data.version || 'unknown'}`, 'success');
+
+                // Show agent section and load agents
+                document.getElementById('letta-agent-section').style.display = 'block';
+                await loadLettaAgents();
+                await loadLettaModels();
+
+            } catch (error) {
+                console.error('Letta connection error:', error);
+                showLettaStatus(`❌ Connection failed: ${error.message}`, 'error');
+                document.getElementById('letta-agent-section').style.display = 'none';
+            }
+
+            testBtn.disabled = false;
+            testBtn.textContent = '🔌 Test Connection';
+        }
+
+        // Load Letta agents
+        async function loadLettaAgents() {
+            try {
+                const response = await fetch(`${lettaConfig.baseUrl}/v1/agents`, {
+                    headers: {
+                        'Authorization': `Bearer ${lettaConfig.password}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                lettaAgents = await response.json();
+
+                const agentSelect = document.getElementById('letta-agent-select');
+                agentSelect.innerHTML = '<option value="">-- Select an agent --</option>';
+
+                lettaAgents.forEach(agent => {
+                    const option = document.createElement('option');
+                    option.value = agent.id;
+                    option.textContent = `${agent.name} (${agent.id.substring(0, 8)}...)`;
+                    agentSelect.appendChild(option);
+                });
+
+                showLettaStatus(`✅ Loaded ${lettaAgents.length} agent(s)`, 'success');
+
+            } catch (error) {
+                console.error('Error loading agents:', error);
+                showLettaStatus(`❌ Failed to load agents: ${error.message}`, 'error');
+            }
+        }
+
+        // Load available Letta models
+        async function loadLettaModels() {
+            try {
+                const response = await fetch(`${lettaConfig.baseUrl}/v1/models`, {
+                    headers: {
+                        'Authorization': `Bearer ${lettaConfig.password}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                lettaModels = await response.json();
+                console.log('Loaded models:', lettaModels);
+
+            } catch (error) {
+                console.error('Error loading models:', error);
+                showLettaStatus(`⚠️ Warning: Could not load models list`, 'warning');
+            }
+        }
+
+        // Select a Letta agent
+        async function selectLettaAgent() {
+            const agentId = document.getElementById('letta-agent-select').value;
+
+            if (!agentId) {
+                document.getElementById('letta-agent-details').style.display = 'none';
+                selectedAgent = null;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${lettaConfig.baseUrl}/v1/agents/${agentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${lettaConfig.password}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                selectedAgent = await response.json();
+
+                // Update agent details display
+                document.getElementById('letta-agent-name').textContent = selectedAgent.name || 'Unknown';
+                document.getElementById('letta-current-model').textContent = selectedAgent.llm_config?.model || 'Not configured';
+                document.getElementById('letta-memory-backend').textContent = selectedAgent.memory?.memory_backend || 'Unknown';
+
+                // Populate model selector
+                const modelSelect = document.getElementById('letta-model-select');
+                modelSelect.innerHTML = '';
+
+                if (lettaModels && lettaModels.length > 0) {
+                    lettaModels.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.model || model;
+                        option.textContent = model.model || model;
+
+                        // Pre-select current model
+                        if ((model.model || model) === selectedAgent.llm_config?.model) {
+                            option.selected = true;
+                        }
+
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    // If models list failed to load, show manual input option
+                    const option = document.createElement('option');
+                    option.value = selectedAgent.llm_config?.model || '';
+                    option.textContent = `Current: ${selectedAgent.llm_config?.model || 'Unknown'}`;
+                    modelSelect.appendChild(option);
+
+                    // Add some common models as options
+                    const commonModels = [
+                        'gpt-4-turbo',
+                        'gpt-4',
+                        'gpt-3.5-turbo',
+                        'claude-3-opus-20240229',
+                        'claude-3-sonnet-20240229',
+                        'claude-3-haiku-20240307'
+                    ];
+                    commonModels.forEach(model => {
+                        const opt = document.createElement('option');
+                        opt.value = model;
+                        opt.textContent = model;
+                        modelSelect.appendChild(opt);
+                    });
+                }
+
+                document.getElementById('letta-agent-details').style.display = 'block';
+                showLettaStatus(`✅ Loaded agent: ${selectedAgent.name}`, 'success');
+
+            } catch (error) {
+                console.error('Error loading agent details:', error);
+                showLettaStatus(`❌ Failed to load agent: ${error.message}`, 'error');
+                document.getElementById('letta-agent-details').style.display = 'none';
+            }
+        }
+
+        // Update agent's LLM model
+        async function updateLettaAgentModel() {
+            if (!selectedAgent) {
+                showLettaStatus('❌ No agent selected', 'error');
+                return;
+            }
+
+            const newModel = document.getElementById('letta-model-select').value;
+            if (!newModel) {
+                showLettaStatus('❌ Please select a model', 'error');
+                return;
+            }
+
+            const updateBtn = document.getElementById('update-model-btn');
+            updateBtn.disabled = true;
+            updateBtn.textContent = '⏳ Updating...';
+
+            try {
+                // Prepare the update payload - update the llm_config
+                const updatePayload = {
+                    llm_config: {
+                        ...selectedAgent.llm_config,
+                        model: newModel
+                    }
+                };
+
+                const response = await fetch(`${lettaConfig.baseUrl}/v1/agents/${selectedAgent.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${lettaConfig.password}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatePayload)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const updatedAgent = await response.json();
+                selectedAgent = updatedAgent;
+
+                // Update display
+                document.getElementById('letta-current-model').textContent = updatedAgent.llm_config?.model || newModel;
+
+                showLettaStatus(`✅ Model updated to: ${newModel}`, 'success');
+
+            } catch (error) {
+                console.error('Error updating agent model:', error);
+                showLettaStatus(`❌ Update failed: ${error.message}`, 'error');
+            }
+
+            updateBtn.disabled = false;
+            updateBtn.textContent = '✨ Update Agent Model';
+        }
+
+        // Show Letta status message
+        function showLettaStatus(message, type) {
+            const statusDiv = document.getElementById('letta-connection-status');
+            statusDiv.style.display = 'block';
+
+            let className = 'info-box ';
+            if (type === 'success') className += 'success';
+            else if (type === 'error') className += 'warning';
+            else if (type === 'warning') className += 'warning';
+            else className += 'info';
+
+            statusDiv.className = className;
+            statusDiv.innerHTML = `<div style="font-size: 0.9em;">${message}</div>`;
+
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // ========== END LETTA FUNCTIONS ==========
 
         // Helper functions
         function updateQuietHoursVisibility() {
