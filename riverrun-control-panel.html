@@ -194,6 +194,38 @@
             transform: translateY(-1px);
         }
 
+        /* Clear Cache Button */
+        .clear-cache-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 0.95em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            background: #fd7e14;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(253, 126, 20, 0.3);
+        }
+
+        .clear-cache-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .clear-cache-btn:hover:not(:disabled) {
+            background: #e96b02;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(253, 126, 20, 0.4);
+        }
+
+        .cache-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #eee;
+        }
+
         /* Form Elements */
         label {
             display: block;
@@ -264,7 +296,7 @@
 
         .stat-value {
             font-size: 1.8em;
-            fontWeight: bold;
+            font-weight: bold;
             color: #333;
         }
 
@@ -404,8 +436,18 @@
                     <div id="posts-today" style="font-size: 1.5em; font-weight: bold;">--</div>
                 </div>
                 <div class="mini-stat">
-                    <div style="font-size: 0.75em; color: #666;">Est. Cost/Day</div>
-                    <div id="cost-today" style="font-size: 1.5em; font-weight: bold;">--</div>
+                    <div style="font-size: 0.75em; color: #666;">Posts This Hour</div>
+                    <div id="posts-hour" style="font-size: 1.5em; font-weight: bold;">--</div>
+                </div>
+            </div>
+
+            <!-- Clear Cache Section -->
+            <div class="cache-section">
+                <button id="clearCacheBtn" class="clear-cache-btn" onclick="clearCache()" disabled>
+                    🧹 Clear Cache & Reset Timeline
+                </button>
+                <div class="hint" style="text-align: center; margin-top: 8px;">
+                    Clears all pending notifications. Bot will only see new mentions after this moment.
                 </div>
             </div>
         </div>
@@ -415,15 +457,28 @@
             <div class="form-section">
                 <label for="model-select">🤖 AI Model</label>
                 <select id="model-select" disabled>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash - $ - Best Value</option>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash - $ - Good</option>
-                    <option value="claude-haiku-4">Claude Haiku 4 - $$ - Balanced</option>
-                    <option value="claude-sonnet-4">Claude Sonnet 4 - $$$ - High Quality</option>
-                    <option value="claude-sonnet-4-5">Claude Sonnet 4.5 - $$$$ - Premium</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini - $$ - Balanced</option>
-                    <option value="gpt-4o">GPT-4o - $$$ - High Quality</option>
+                    <!-- Google Models (Default) -->
+                    <optgroup label="🔷 Google (Default)">
+                        <option value="google_ai/gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro Preview ⭐</option>
+                        <option value="google_ai/gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    </optgroup>
+                    
+                    <!-- OpenAI Models -->
+                    <optgroup label="🔶 OpenAI">
+                        <option value="openai/gpt-5-mini-2025-08-07">GPT-5 Mini</option>
+                        <option value="openai/gpt-5-2025-08-07">GPT-5</option>
+                        <option value="openai/gpt-5-nano-2025-08-07">GPT-5 Nano</option>
+                        <option value="openai/o3-2025-04-16">O3 (Reasoning)</option>
+                        <option value="openai/o4-mini-2025-04-16">O4 Mini</option>
+                    </optgroup>
+                    
+                    <!-- Anthropic Models -->
+                    <optgroup label="🔸 Anthropic">
+                        <option value="anthropic/claude-sonnet-4-5-20250929">Claude Sonnet 4.5</option>
+                        <option value="anthropic/claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+                    </optgroup>
                 </select>
-                <div class="hint">💡 Gemini Flash models offer the best cost-to-quality ratio</div>
+                <div class="hint">💡 Select the AI model for your bot's responses</div>
             </div>
 
             <div class="form-section">
@@ -437,17 +492,12 @@
                 <div class="hint">Limits responses to prevent runaway costs</div>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-label">💰 Estimated Cost Per Post</div>
-                <div class="stat-value" id="cost-per-post">$0.01</div>
-            </div>
-
             <div class="info-box info">
                 <div style="font-weight: bold; margin-bottom: 10px;">
-                    💡 Cost Estimate
+                    💡 Model Information
                 </div>
-                <div id="cost-estimate">
-                    At current settings: <strong>~$3-5/month</strong>
+                <div id="model-info">
+                    Check your API provider's dashboard for actual usage and costs.
                 </div>
             </div>
 
@@ -478,17 +528,18 @@
 
                 <div id="quiet-hours-settings">
                     <div class="form-section">
-                        <label for="quiet-start">Start Time (Sleep Mode)</label>
+                        <label for="quiet-start">Start Time (Sleep Mode) - UTC</label>
                         <input type="time" id="quiet-start" value="23:00" disabled>
+                        <div class="hint">⚠️ Times are in UTC. Your current time: <span id="local-time">--:--</span> = UTC: <span id="utc-time">--:--</span></div>
                     </div>
 
                     <div class="form-section">
-                        <label for="quiet-end">End Time (Wake Up)</label>
+                        <label for="quiet-end">End Time (Wake Up) - UTC</label>
                         <input type="time" id="quiet-end" value="07:00" disabled>
                     </div>
 
                     <div class="info-box warning" id="quiet-hours-info" style="display: none;">
-                        💤 Bot will not post between <span id="quiet-display-start">23:00</span> and <span id="quiet-display-end">07:00</span> (saves ~33% costs)
+                        💤 Bot will not post between <span id="quiet-display-start">23:00</span> and <span id="quiet-display-end">07:00</span> UTC (saves ~33% costs)
                     </div>
                 </div>
             </div>
@@ -583,7 +634,7 @@
             toggleBtn.disabled = false;
 
             // Update settings display
-            document.getElementById('display-model').textContent = data.model || 'gemini-2.5-flash';
+            document.getElementById('display-model').textContent = data.model || 'google_ai/gemini-2.5-pro-preview-06-05';
             document.getElementById('display-max-posts').textContent = `${data.maxPostsPerHour || 10} (${data.postsThisHour || 0} used)`;
             
             const quietEnabled = data.quietHoursEnabled || false;
@@ -592,7 +643,7 @@
             document.getElementById('display-quiet-hours').textContent = quietEnabled ? `${quietStart} - ${quietEnd}` : 'Disabled';
 
             // Update form fields
-            document.getElementById('model-select').value = data.model || 'gemini-2.5-flash';
+            document.getElementById('model-select').value = data.model || 'google_ai/gemini-2.5-pro-preview-06-05';
             document.getElementById('max-posts-range').value = data.maxPostsPerHour || 10;
             document.getElementById('max-posts-value').textContent = data.maxPostsPerHour || 10;
             document.getElementById('quiet-hours-enabled').checked = quietEnabled;
@@ -602,9 +653,7 @@
 
             // Update stats
             document.getElementById('posts-today').textContent = data.postsToday || 0;
-            const costPerPost = estimateCostPerPost(data.model || 'gemini-2.5-flash');
-            document.getElementById('cost-per-post').textContent = `$${costPerPost.toFixed(4)}`;
-            document.getElementById('cost-today').textContent = `$${((data.postsToday || 0) * costPerPost).toFixed(2)}`;
+            document.getElementById('posts-hour').textContent = data.postsThisHour || 0;
 
             // Update preview
             updateSchedulePreview();
@@ -652,6 +701,13 @@
 
         // Save settings
         async function saveSettings() {
+            console.log('[saveSettings] Function called');
+            
+            if (!secret) {
+                showError('Please enter your password first');
+                return;
+            }
+            
             const saveButtons = document.querySelectorAll('.save-button');
             saveButtons.forEach(btn => btn.disabled = true);
 
@@ -662,6 +718,8 @@
                 quietHoursStart: document.getElementById('quiet-start').value,
                 quietHoursEnd: document.getElementById('quiet-end').value
             };
+
+            console.log('[saveSettings] Sending settings:', settings);
 
             try {
                 const response = await fetch(`${API_URL}/control/settings`, {
@@ -683,6 +741,9 @@
                 currentSettings = data;
                 updateUI(data);
                 showSuccess('Settings saved successfully!');
+                
+                // Save secret on successful operation
+                localStorage.setItem('riverrun_secret', secret);
             } catch (error) {
                 console.error('Error saving settings:', error);
                 showError('Error saving settings');
@@ -691,20 +752,57 @@
             saveButtons.forEach(btn => btn.disabled = false);
         }
 
-        // Helper functions
-        function estimateCostPerPost(model) {
-            const costs = {
-                'gemini-2.5-flash': 0.001,
-                'gemini-2.0-flash': 0.0015,
-                'claude-haiku-4': 0.003,
-                'claude-sonnet-4': 0.015,
-                'claude-sonnet-4-5': 0.03,
-                'gpt-4o-mini': 0.005,
-                'gpt-4o': 0.025
-            };
-            return costs[model] || 0.01;
+        // Clear cache and reset timeline
+        async function clearCache() {
+            if (!secret) {
+                showError('Please enter your password first');
+                return;
+            }
+
+            // Confirmation dialog
+            if (!confirm('⚠️ Clear all cached notifications?\n\nThe bot will forget all pending mentions and start fresh from this moment.\n\nThis is useful when restarting after being offline.')) {
+                return;
+            }
+
+            const clearBtn = document.getElementById('clearCacheBtn');
+            const originalText = clearBtn.textContent;
+            clearBtn.disabled = true;
+            clearBtn.textContent = '🔄 Clearing...';
+
+            try {
+                const response = await fetch(`${API_URL}/control/clear-cache`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Control-Secret': secret
+                    }
+                });
+
+                if (response.status === 401) {
+                    showError('Invalid password');
+                    clearBtn.disabled = false;
+                    clearBtn.textContent = originalText;
+                    return;
+                }
+
+                const data = await response.json();
+                currentSettings = data;
+                updateUI(data);
+                
+                const clearedTime = new Date(data.clearedAt).toLocaleString();
+                showSuccess(`✨ Cache cleared! Timeline reset to ${clearedTime}`);
+                
+                // Save secret on successful operation
+                localStorage.setItem('riverrun_secret', secret);
+            } catch (error) {
+                console.error('Error clearing cache:', error);
+                showError('Error clearing cache: ' + error.message);
+            }
+
+            clearBtn.disabled = false;
+            clearBtn.textContent = originalText;
         }
 
+        // Helper functions
         function updateQuietHoursVisibility() {
             const enabled = document.getElementById('quiet-hours-enabled').checked;
             const settings = document.getElementById('quiet-hours-settings');
@@ -744,6 +842,7 @@
             document.getElementById('quiet-hours-enabled').disabled = false;
             document.getElementById('save-costs-btn').disabled = false;
             document.getElementById('save-schedule-btn').disabled = false;
+            document.getElementById('clearCacheBtn').disabled = false;
             updateQuietHoursVisibility();
         }
 
@@ -794,10 +893,26 @@
         document.getElementById('quiet-start').addEventListener('change', updateSchedulePreview);
         document.getElementById('quiet-end').addEventListener('change', updateSchedulePreview);
 
+        // Update time display helper
+        function updateTimeDisplay() {
+            const now = new Date();
+            const localTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            const utcTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+            
+            const localTimeEl = document.getElementById('local-time');
+            const utcTimeEl = document.getElementById('utc-time');
+            if (localTimeEl) localTimeEl.textContent = localTime;
+            if (utcTimeEl) utcTimeEl.textContent = utcTime;
+        }
+
         // Check status on load
         if (secret) {
             loadStatus();
         }
+
+        // Update time display immediately and every minute
+        updateTimeDisplay();
+        setInterval(updateTimeDisplay, 60000);
 
         // Auto-refresh status every 30 seconds
         setInterval(() => {
